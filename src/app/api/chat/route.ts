@@ -26,10 +26,13 @@ function generateLocalAdvice(messages: any[], explicitLanguage: string) {
 }
 
 export async function POST(req: Request) {
+  let safeMessages: any[] = [];
+  let safeLanguage = "English";
+
   try {
-    const { messages, language } = await req.json();
-    const safeLanguage = typeof language === "string" ? language : "English";
-    const safeMessages = Array.isArray(messages) ? messages : [];
+    const body = await req.json();
+    safeLanguage = typeof body.language === "string" ? body.language : "English";
+    safeMessages = Array.isArray(body.messages) ? body.messages : [];
 
     const groqApiKey = process.env.GROQ_API_KEY;
     if (!groqApiKey) {
@@ -69,8 +72,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ 
       content: response.choices[0]?.message?.content || "No response generated." 
     });
-  } catch (error) {
-    console.error("Groq Cloud AI Error:", error);
-    return NextResponse.json({ error: "Failed to process request through Groq Cloud" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Groq Cloud API rejected the request:", error?.message || error);
+    
+    // Absolute Fail-Safe: Return our Universal NLP Engine so the bot never throws a 500 status!
+    return NextResponse.json({ 
+      content: generateLocalAdvice(safeMessages, safeLanguage) 
+    });
   }
 }
